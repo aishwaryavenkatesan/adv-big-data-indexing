@@ -6,4 +6,6 @@ const router = express.Router();
 
 router.route("/:id").get(controller.getPlanValues);
 
+router.route("/").post(controller.postPlanValues);
+
 export default router;
