@@ -31,18 +31,18 @@ export const postPlanValues = async (request, response) => {
     const planPosted = await postValue(JSON.stringify(planFromUser));
 
     if (planPosted) {
-      const planCreation = await client.set(
-        "employee1",
-        JSON.stringify(planFromUser)
-      );
-      response.status(200);
+      // const planCreation = await client.SET(
+      //   "plan",
+      //   JSON.stringify(planFromUser)
+      // );
+      // response.status(200);
       response.send(JSON.parse(JSON.stringify(planPosted)));
     }
 
-    // if (planPosted == null) throw new Error(err);
+    if (planPosted == null || !planPosted) throw new Error();
   } catch (err) {
     console.log("inside catch post");
-    console.log(err);
+    // console.log(err);
     response.status(400);
     response.send({ errorMessage: "plaan cannot be added to key-value store" });
   }
