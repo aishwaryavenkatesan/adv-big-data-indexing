@@ -12,7 +12,8 @@ export const getValue = async (key) => {
 //post data based on validation with schema
 export const postValue = async (newPlan) => {
   const ajv = new Ajv();
-  let rawSchemaData = readFileSync("schemaForPlan.json");
+  // let rawSchemaData = readFileSync("schemaForPlan.json");
+  let rawSchemaData = readFileSync("sampleSchema.json");
   let schema = JSON.parse(rawSchemaData);
 
   let input = JSON.parse(newPlan);
@@ -21,7 +22,12 @@ export const postValue = async (newPlan) => {
   console.log(isValid);
 
   if (isValid) {
-    const planCreation = client.json.set("plan-object-2", "$", input);
+    const planCreation = client.json.set("emp-obj1", "$", input);
   }
   return isValid;
+};
+
+export const deleteValue = async (key) => {
+  const deleteStatus = await client.json.del(key, "$");
+  return deleteStatus;
 };
