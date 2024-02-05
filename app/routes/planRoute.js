@@ -9,6 +9,6 @@ router
   .get(controller.getPlanValues)
   .delete(controller.removePlanValues);
 
-router.route("/").post(controller.postPlanValues);
+router.route("/").post(controller.postPlanValues).get(controller.getAll);
 
 export default router;
