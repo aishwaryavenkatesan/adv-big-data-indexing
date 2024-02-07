@@ -71,7 +71,7 @@
     "objectId": { "type": "string" },
     "objectType": { "type": "string" },
     "planType": { "type": "string" },
-    "creationDate": { "type": "string" }
+    "creationDate": { "type": "string", "format": "custom-date" }
   },
   "required": [
     "planCostShares",

@@ -1,5 +1,6 @@
 import client from "../utils/redisdb.js";
 import Ajv from "ajv";
+import addFormats from "ajv-formats";
 import { readFileSync } from "fs";
 
 //get value based on key
@@ -10,8 +11,12 @@ export const getValue = async (key) => {
 };
 
 //post data based on validation with schema
-export const postValue = async (newPlan) => {
+export const postValue = async (newPlan, objectId) => {
   const ajv = new Ajv();
+  ajv.addFormat("custom-date", function checkDateFieldFormat(deadlineDate) {
+    const deadlineRegex = /\d{1,2}\-\d{1,2}\-\d{4}/;
+    return deadlineRegex.test(deadlineDate);
+  });
   // let rawSchemaData = readFileSync("schemaForPlan.json");
   let rawSchemaData = readFileSync("schemaForPlan.json");
   let schema = JSON.parse(rawSchemaData);
@@ -22,7 +27,7 @@ export const postValue = async (newPlan) => {
   console.log(isValid);
 
   if (isValid) {
-    const planCreation = client.json.set("12xvxc345ssdsds-509", "$", input);
+    const planCreation = client.json.set(objectId, "$", input);
   }
   return isValid;
 };

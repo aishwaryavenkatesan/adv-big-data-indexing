@@ -52,7 +52,7 @@ export const postPlanValues = async (request, response) => {
     console.log("object id " + objectId);
     console.log("plan " + planFromUser);
 
-    const planPosted = await postValue(JSON.stringify(planFromUser));
+    const planPosted = await postValue(JSON.stringify(planFromUser), objectId);
 
     if (planPosted) {
       // const planCreation = await client.SET(
