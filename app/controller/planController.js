@@ -63,7 +63,8 @@ export const postPlanValues = async (request, response) => {
       const etagFromserver = etag(JSON.stringify(planFromUser));
       console.log("post etag " + etagFromserver);
       response.setHeader("ETag", etagFromserver);
-      response.send(JSON.parse(JSON.stringify(planPosted)));
+      response.status(201);
+      response.send({ message: "plan added to key-value store" });
     }
 
     if (planPosted == null || !planPosted) throw new Error();
@@ -71,7 +72,7 @@ export const postPlanValues = async (request, response) => {
     console.log("inside catch post");
     // console.log(err);
     response.status(400);
-    response.send({ errorMessage: "plaan cannot be added to key-value store" });
+    response.send({ errorMessage: "plan cannot be added to key-value store" });
   }
 };
 
@@ -82,8 +83,8 @@ export const removePlanValues = async (request, response) => {
     const numOfKeysDeleted = await deleteValue(keyToRemove);
 
     if (numOfKeysDeleted > 0) {
-      response.status(200);
-      response.send({ message: "deleted " });
+      response.status(204);
+      response.send({ message: "plan deleted " });
     }
 
     if (numOfKeysDeleted == 0) throw new Error();
