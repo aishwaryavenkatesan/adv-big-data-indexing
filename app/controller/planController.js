@@ -4,6 +4,7 @@ import {
   postValue,
   deleteValue,
   getAllValues,
+  updateNewPlan,
 } from "../service/planService.js";
 import client from "../utils/redisdb.js";
 import etag from "etag";
@@ -18,7 +19,7 @@ export const getPlanValues = async (request, response) => {
 
     if (valueFound == null) throw new Error();
 
-    const etagFromClient = JSON.stringify(request.get("if-none-match"));
+    const etagFromClient = request.get("if-none-match");
     const etagFromServer = etag(JSON.stringify(valueFound));
 
     // console.log("etag client " + etagFromClient);
@@ -75,6 +76,27 @@ export const postPlanValues = async (request, response) => {
     response.send({ errorMessage: "plan cannot be added to key-value store" });
   }
 };
+function storeInRedis(data) {
+  const client = createRedisClient();
+  for (let key in data) {
+    if (typeof data[key] === "object") {
+      if (data[key].hasOwnProperty("objectId")) {
+        client.hSet(
+          `${data[key].objectType}:${data[key].objectId}`,
+          "field",
+          JSON.stringify(data[key]),
+          (err, reply) => {
+            if (err) console.error(err);
+            console.log(
+              `Stored object with objectId ${data[key].objectId} in Redis`
+            );
+          }
+        );
+      }
+      storeInRedis(data[key]); // Recursively call for nested objects
+    }
+  }
+}
 
 //controller method to delete value in in db
 export const removePlanValues = async (request, response) => {
@@ -123,5 +145,29 @@ export const getAll = async (request, response) => {
   } catch (err) {
     response.status(404);
     response.send({ errorMessage: "values not found" });
+  }
+};
+
+//controller method for patch
+export const updateValues = async (request, response) => {
+  try {
+    const keyToUpdate = request.params.id;
+    const planFromUser = request.body;
+
+    const afterRedisPatch = await updateNewPlan(request, keyToUpdate);
+    if (afterRedisPatch == null) throw new Error();
+    if (afterRedisPatch === "not available") {
+      response.status(412);
+      response.send("etag does not match");
+    } else {
+      const etagFromServer = etag(JSON.stringify(afterRedisPatch));
+      response.setHeader("ETag", etagFromServer); // comments
+      response.status(204).send({ message: "update successful" });
+    }
+  } catch (err) {
+    console.log("inside catch block for patch");
+    console.log(err);
+    response.status(404);
+    response.send({ errorMessage: "key to update not found" });
   }
 };

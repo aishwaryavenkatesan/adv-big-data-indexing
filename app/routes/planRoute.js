@@ -9,9 +9,9 @@ const client = new OAuth2Client(CLIENT_ID);
 
 router.use(async (req, res, next) => {
   const authHeader = req.headers.authorization;
-  console.log("auth header " + authHeader);
+  // console.log("auth header " + authHeader);
   const token = authHeader && authHeader.split(" ")[1];
-  console.log("token " + token);
+  // console.log("token " + token);
   if (token == null || token === undefined)
     return res.status(401).send({ message: "Invalid or missing token" });
 
@@ -26,7 +26,7 @@ router.use(async (req, res, next) => {
     next();
   } catch (error) {
     console.error("Token verification failed:", error);
-    return res.status(403).send({ message: "cannot verify token" }); // Forbidden
+    return res.status(401).send({ message: "cannot verify token" }); // Forbidden
   }
 });
 // const authenticateToken = async (req, res, next) => {
@@ -53,7 +53,8 @@ router.use(async (req, res, next) => {
 router
   .route("/:id")
   .get(controller.getPlanValues)
-  .delete(controller.removePlanValues);
+  .delete(controller.removePlanValues)
+  .patch(controller.updateValues);
 
 router.route("/").post(controller.postPlanValues).get(controller.getAll);
 
