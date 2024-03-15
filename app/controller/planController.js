@@ -53,7 +53,7 @@ export const postPlanValues = async (request, response) => {
     console.log("object id " + objectId);
     console.log("plan " + planFromUser);
 
-    const planPosted = await postValue(JSON.stringify(planFromUser), objectId);
+    const planPosted = await postValue(planFromUser, objectId);
 
     if (planPosted) {
       // const planCreation = await client.SET(
@@ -156,7 +156,14 @@ export const updateValues = async (request, response) => {
 
     const afterRedisPatch = await updateNewPlan(request, keyToUpdate);
     if (afterRedisPatch == null) throw new Error();
-    if (afterRedisPatch === "not available") {
+    else if (afterRedisPatch == false) {
+      response.status(400);
+      response.send({
+        message: "plan cannot be added to key value store as schema not valid",
+      });
+    }
+    // if isValid is false, cannot be added to key value store
+    else if (afterRedisPatch === "not available") {
       response.status(412);
       response.send("etag does not match");
     } else {

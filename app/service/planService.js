@@ -44,8 +44,7 @@ export const postValue = async (newPlan, objectId) => {
   // let rawSchemaData = readFileSync("schemaForPlan.json");
   let rawSchemaData = readFileSync("schemaForPlan.json");
   let schema = JSON.parse(rawSchemaData);
-
-  let input = JSON.parse(newPlan);
+  let input = newPlan;
 
   const isValid = ajv.validate(schema, input);
   console.log(isValid);
@@ -122,23 +121,42 @@ export const updateNewPlan = async (request, key) => {
       console.log("plan not available");
       return plan;
     } else {
-      const etagFromClient = request.get("if-match");
-      const etagFromServer = etag(JSON.stringify(plan));
-      console.log("Post Etag", etagFromClient);
-      console.log("Patch Etag", etagFromServer);
+      const ajv = new Ajv();
+      ajv.addFormat("custom-date", function checkDateFieldFormat(deadlineDate) {
+        const deadlineRegex = /\d{1,2}\-\d{1,2}\-\d{4}/;
+        return deadlineRegex.test(deadlineDate);
+      });
 
-      if (etagFromClient === etagFromServer) {
-        const newData = request.body;
-        const mergedData = mergeData(plan, newData);
-        const planCreation = await client.json.set(key, "$", mergedData);
-        console.log("Plan Creation:", planCreation);
-        console.log("inside is valid check");
-        const putValue = await client.json.get(key);
-        storeInRedis(putValue);
-        console.log("after redis");
-        return putValue; //"available"
+      let rawSchemaData = readFileSync("schemaForPlan.json");
+      let schema = JSON.parse(rawSchemaData);
+      let input = request.body;
+
+      const isValid = ajv.validate(schema, input);
+      console.log(isValid);
+      console.log("after validation check");
+
+      if (isValid) {
+        const etagFromClient = request.get("if-match");
+        const etagFromServer = etag(JSON.stringify(plan));
+        console.log("Post Etag", etagFromClient);
+        console.log("Patch Etag", etagFromServer);
+
+        if (etagFromClient === etagFromServer) {
+          const newData = request.body;
+          const mergedData = mergeData(plan, newData);
+          const planCreation = await client.json.set(key, "$", mergedData);
+          console.log("Plan Creation:", planCreation);
+          console.log("inside is valid check");
+          const putValue = await client.json.get(key);
+          storeInRedis(putValue);
+          console.log("after redis");
+          return putValue; //"available"
+        } else {
+          return "not available";
+        }
       } else {
-        return "not available";
+        console.log("inside else for schema validation part");
+        return isValid;
       }
     }
   } catch (err) {
