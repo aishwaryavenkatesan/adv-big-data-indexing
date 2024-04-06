@@ -121,6 +121,7 @@ export const updateNewPlan = async (request, key) => {
       console.log("plan not available");
       return plan;
     } else {
+      //to check if request body is valid for the given schema
       const ajv = new Ajv();
       ajv.addFormat("custom-date", function checkDateFieldFormat(deadlineDate) {
         const deadlineRegex = /\d{1,2}\-\d{1,2}\-\d{4}/;
