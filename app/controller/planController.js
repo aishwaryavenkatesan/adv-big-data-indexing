@@ -8,6 +8,7 @@ import {
 } from "../service/planService.js";
 import client from "../utils/redisdb.js";
 import etag from "etag";
+import channel from "../utils/rabbitmqHelper.js";
 
 //controller method to get value based on key
 export const getPlanValues = async (request, response) => {
@@ -52,6 +53,11 @@ export const postPlanValues = async (request, response) => {
     const objectId = request.body.objectId;
     console.log("object id " + objectId);
     console.log("plan " + planFromUser);
+
+    const queue = "insuracePlan";
+    await channel.assertQueue(queue, { durable: false });
+    channel.sendToQueue(queue, Buffer.from(JSON.stringify(planFromUser)));
+    console.log(" [x] Sent %s", JSON.stringify(planFromUser));
 
     const planPosted = await postValue(planFromUser, objectId);
 

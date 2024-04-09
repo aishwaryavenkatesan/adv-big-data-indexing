@@ -3,7 +3,18 @@ import Ajv from "ajv";
 import addFormats from "ajv-formats";
 import { readFileSync } from "fs";
 import etag from "etag";
+import elasticsearchClient from "../utils/elasticsearchHelper.js";
 
+let masterIndexValue;
+async function dataToIndex(indexValue, documentValue) {
+  console.log("index value in dataToIndex function", indexValue);
+  let indexInElasticsearch = await elasticsearchClient.index({
+    index: masterIndexValue,
+    id: indexValue,
+    document: documentValue,
+  });
+  console.log("client reply ", indexInElasticsearch);
+}
 //to store multiple keys
 function storeInRedis(data) {
   for (let key in data) {
@@ -21,6 +32,17 @@ function storeInRedis(data) {
             );
           }
         );
+        // console.log("adding data to elasticsearch");
+        let indexValue = `${data[key].objectType}:${data[key].objectId}`;
+        let documentValue = data[key];
+        // console.log("index value ", indexValue);
+        dataToIndex(indexValue, documentValue);
+
+        // let indexInElasticsearch = elasticsearchClient.index({
+        //   index: "insurance-index",
+        //   id: indexValue,
+        //   document: data[key],
+        // });
       }
       storeInRedis(data[key]); // Recursively call for nested objects
     }
@@ -51,9 +73,16 @@ export const postValue = async (newPlan, objectId) => {
 
   if (isValid) {
     console.log("inside is valid check");
+    masterIndexValue = objectId;
+    console.log("master index value ", masterIndexValue);
     storeInRedis(input);
     console.log("after redis");
     const planCreation = client.json.set(objectId, "$", input);
+    const dataInElasticsearch = await elasticsearchClient.index({
+      index: objectId,
+      id: objectId,
+      document: input,
+    });
   }
   return isValid;
 };
@@ -145,7 +174,13 @@ export const updateNewPlan = async (request, key) => {
         if (etagFromClient === etagFromServer) {
           const newData = request.body;
           const mergedData = mergeData(plan, newData);
+          masterIndexValue = key;
           const planCreation = await client.json.set(key, "$", mergedData);
+          const dataInElasticsearch = await elasticsearchClient.index({
+            index: key,
+            id: key,
+            document: mergedData,
+          });
           console.log("Plan Creation:", planCreation);
           console.log("inside is valid check");
           const putValue = await client.json.get(key);
