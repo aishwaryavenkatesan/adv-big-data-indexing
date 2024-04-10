@@ -4,16 +4,29 @@ import addFormats from "ajv-formats";
 import { readFileSync } from "fs";
 import etag from "etag";
 import elasticsearchClient from "../utils/elasticsearchHelper.js";
+import channel from "../utils/rabbitmqHelper.js";
+
+//consume from queue
+const queue = "insuracePlan";
+await channel.assertQueue(queue, { durable: false });
 
 let masterIndexValue;
 async function dataToIndex(indexValue, documentValue) {
-  console.log("index value in dataToIndex function", indexValue);
+  // console.log("index value in dataToIndex function", indexValue);
   let indexInElasticsearch = await elasticsearchClient.index({
     index: masterIndexValue,
     id: indexValue,
     document: documentValue,
   });
-  console.log("client reply ", indexInElasticsearch);
+  // console.log("client reply ", indexInElasticsearch);
+}
+
+async function deleteIndex(indexValue) {
+  console.log("inside delete index");
+  let deletedIndex = await elasticsearchClient.delete({
+    index: masterIndexValue,
+    id: indexValue,
+  });
 }
 //to store multiple keys
 function storeInRedis(data) {
@@ -51,6 +64,16 @@ function storeInRedis(data) {
 
 //get value based on key
 export const getValue = async (key) => {
+  let keyToGet;
+  await channel.consume(
+    queue,
+    (msg) => {
+      console.log("message from queue ", JSON.parse(msg.content.toString()));
+      // keyToGet = JSON.parse(msg.content.toString());
+      // console.log("key ", keyToGet);
+    },
+    { noAck: true }
+  );
   const keyValue = await client.json.get(key);
   console.log("key value in service " + JSON.stringify(keyValue));
   return keyValue;
@@ -75,6 +98,14 @@ export const postValue = async (newPlan, objectId) => {
     console.log("inside is valid check");
     masterIndexValue = objectId;
     console.log("master index value ", masterIndexValue);
+    await channel.consume(
+      queue,
+      (msg) => {
+        console.log("message from queue ", JSON.parse(msg.content.toString()));
+      },
+      { noAck: true }
+    );
+    console.log("input from user ", input);
     storeInRedis(input);
     console.log("after redis");
     const planCreation = client.json.set(objectId, "$", input);
@@ -101,6 +132,8 @@ function deleteInRedis(data) {
             );
           }
         );
+        // let indexValueToDelete = `${data[key].objectType}:${data[key].objectId}`;
+        // deleteIndex(indexValueToDelete);
       }
       deleteInRedis(data[key]); // Recursively call for nested objects
     }
@@ -108,9 +141,24 @@ function deleteInRedis(data) {
 }
 
 export const deleteValue = async (key) => {
+  await channel.consume(
+    queue,
+    (msg) => {
+      console.log("message from queue ", JSON.parse(msg.content.toString()));
+    },
+    { noAck: true }
+  );
   const keyValue = await client.json.get(key);
   deleteInRedis(keyValue);
   const deleteStatus = await client.json.del(key, "$");
+  // let deletedIndex = await elasticsearchClient.delete({
+  //   index: masterIndexValue,
+  //   id: key,
+  // });
+  // let deletedMasterIndex = await elasticsearchClient.delete({
+  //   index: masterIndexValue,
+  // });
+  await elasticsearchClient.indices.delete({ index: masterIndexValue });
   return deleteStatus;
 };
 
@@ -145,6 +193,13 @@ function mergeData(existingData, newData) {
 
 export const updateNewPlan = async (request, key) => {
   try {
+    await channel.consume(
+      queue,
+      (msg) => {
+        console.log("message from queue ", JSON.parse(msg.content.toString()));
+      },
+      { noAck: true }
+    );
     const plan = await client.json.get(key);
     if (!plan) {
       console.log("plan not available");

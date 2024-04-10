@@ -10,11 +10,16 @@ import client from "../utils/redisdb.js";
 import etag from "etag";
 import channel from "../utils/rabbitmqHelper.js";
 
+//publish to queue
+const queue = "insuracePlan";
+await channel.assertQueue(queue, { durable: false });
+
 //controller method to get value based on key
 export const getPlanValues = async (request, response) => {
   try {
     const keyToSearch = request.params.id;
     console.log("key to search " + keyToSearch);
+    channel.sendToQueue(queue, Buffer.from(JSON.stringify(keyToSearch)));
     const valueFound = await getValue(keyToSearch);
     console.log("value in controller " + valueFound);
 
@@ -54,8 +59,6 @@ export const postPlanValues = async (request, response) => {
     console.log("object id " + objectId);
     console.log("plan " + planFromUser);
 
-    const queue = "insuracePlan";
-    await channel.assertQueue(queue, { durable: false });
     channel.sendToQueue(queue, Buffer.from(JSON.stringify(planFromUser)));
     console.log(" [x] Sent %s", JSON.stringify(planFromUser));
 
@@ -108,6 +111,7 @@ function storeInRedis(data) {
 export const removePlanValues = async (request, response) => {
   try {
     const keyToRemove = request.params.id;
+    channel.sendToQueue(queue, Buffer.from(JSON.stringify(keyToRemove)));
     const numOfKeysDeleted = await deleteValue(keyToRemove);
 
     if (numOfKeysDeleted > 0) {
@@ -159,7 +163,7 @@ export const updateValues = async (request, response) => {
   try {
     const keyToUpdate = request.params.id;
     const planFromUser = request.body;
-
+    channel.sendToQueue(queue, Buffer.from(JSON.stringify(keyToUpdate)));
     const afterRedisPatch = await updateNewPlan(request, keyToUpdate);
     if (afterRedisPatch == null) throw new Error();
     else if (afterRedisPatch == false) {
