@@ -29,26 +29,6 @@ router.use(async (req, res, next) => {
     return res.status(401).send({ message: "cannot verify token" }); // Forbidden
   }
 });
-// const authenticateToken = async (req, res, next) => {
-//   const authHeader = req.headers.authorization;
-//   const token = authHeader && authHeader.split(" ")[1];
-//   if (token == null)
-//     return res.sendStatus(401).send({ message: "Invalid or missing token" });
-
-//   try {
-//     const ticket = await client.verifyIdToken({
-//       idToken: token,
-//       audience: CLIENT_ID,
-//     });
-//     const payload = ticket.getPayload();
-//     const userid = payload["sub"];
-//     req.user = payload; // Set user information in request object
-//     next();
-//   } catch (error) {
-//     console.error("Token verification failed:", error);
-//     return res.sendStatus(403); // Forbidden
-//   }
-// };
 
 router
   .route("/:id")

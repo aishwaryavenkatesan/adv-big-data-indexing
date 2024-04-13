@@ -80,7 +80,7 @@ export const postPlanValues = async (request, response) => {
     if (planPosted == null || !planPosted) throw new Error();
   } catch (err) {
     console.log("inside catch post");
-    // console.log(err);
+    console.log(err);
     response.status(400);
     response.send({ errorMessage: "plan cannot be added to key-value store" });
   }

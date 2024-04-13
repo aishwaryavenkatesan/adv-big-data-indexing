@@ -5,6 +5,82 @@ import { readFileSync } from "fs";
 import etag from "etag";
 import elasticsearchClient from "../utils/elasticsearchHelper.js";
 import channel from "../utils/rabbitmqHelper.js";
+import { indexMappingJoins, save } from "../utils/elasticsearchMapping.js";
+
+function test() {
+  // Define the mapping
+  const mapping = {
+    mappings: {
+      properties: {
+        user: {
+          type: "text",
+        },
+        weapon: {
+          type: "text",
+        },
+        relation_type: {
+          type: "join",
+          eager_global_ordinals: true,
+          relations: {
+            parent: "child",
+          },
+        },
+      },
+    },
+  };
+
+  // Insert the mapping
+  elasticsearchClient.indices
+    .create({
+      index: "my_index",
+      body: mapping,
+    })
+    .then(() => {
+      // Insert the parent document
+      elasticsearchClient
+        .index({
+          index: "my_index",
+          id: "1",
+          routing: "Kratos",
+          body: {
+            user: "Kratos",
+            weapon: "leviathan ax",
+            relation_type: {
+              name: "parent",
+            },
+          },
+        })
+        .then(() => {
+          // Insert the child document
+          elasticsearchClient
+            .index({
+              index: "my_index",
+              id: "2",
+              routing: "Kratos",
+              body: {
+                user: "Atreus",
+                weapon: "bow",
+                relation_type: {
+                  name: "child",
+                  parent: 1,
+                },
+              },
+            })
+            .then((response) => {
+              console.log("Documents inserted successfully:", response.body);
+            })
+            .catch((error) => {
+              console.error("Error inserting child document:", error);
+            });
+        })
+        .catch((error) => {
+          console.error("Error inserting parent document:", error);
+        });
+    })
+    .catch((error) => {
+      console.error("Error creating index:", error);
+    });
+}
 
 //consume from queue
 const queue = "insuracePlan";
@@ -21,6 +97,19 @@ async function dataToIndex(indexValue, documentValue) {
   // console.log("client reply ", indexInElasticsearch);
 }
 
+async function parentChildIndexing(parentid, indexId, doc) {
+  let documentIndex = await elasticsearchClient.index({
+    index: masterIndexValue,
+    id: indexId,
+    body: {
+      doc,
+      planJoin: {
+        name: plan,
+      },
+    },
+  });
+}
+
 async function deleteIndex(indexValue) {
   console.log("inside delete index");
   let deletedIndex = await elasticsearchClient.delete({
@@ -31,8 +120,8 @@ async function deleteIndex(indexValue) {
 //to store multiple keys
 function storeInRedis(data) {
   for (let key in data) {
-    // console.log("data[key] " + data[key]);
     if (typeof data[key] === "object") {
+      console.log("key name ", key);
       if (data[key].hasOwnProperty("objectId")) {
         client.json.set(
           `${data[key].objectType}:${data[key].objectId}`,
@@ -45,22 +134,44 @@ function storeInRedis(data) {
             );
           }
         );
-        // console.log("adding data to elasticsearch");
         let indexValue = `${data[key].objectType}:${data[key].objectId}`;
         let documentValue = data[key];
         // console.log("index value ", indexValue);
-        dataToIndex(indexValue, documentValue);
-
-        // let indexInElasticsearch = elasticsearchClient.index({
-        //   index: "insurance-index",
-        //   id: indexValue,
-        //   document: data[key],
-        // });
+        // dataToIndex(indexValue, documentValue);
       }
       storeInRedis(data[key]); // Recursively call for nested objects
     }
   }
 }
+
+// async function storeHashedInRedis(data) {
+//   try {
+//     console.log("inside function to store hash");
+//     // Store the document in Redis as a hash
+//     // const resp = await client.hSet(`document:${data.objectId}`, data);
+//     const resp = await client.hSet(
+//       `document:${data.objectId}`,
+//       "name",
+//       data.toString()
+//     );
+//     console.log("resp", resp);
+
+//     // If the document is a parent, store its child IDs
+//     if (data.linkedPlanServices) {
+//       const parentID = data.objectId;
+//       const childIDs = data.linkedPlanServices.map((child) => child.objectId);
+
+//       // Store the parent-child relationship
+//       client.hSet(
+//         `parent_children:${parentID}`,
+//         "children",
+//         JSON.stringify(childIDs)
+//       );
+//     }
+//   } catch (error) {
+//     console.error("Error storing document in Redis:", error);
+//   }
+// }
 
 //get value based on key
 export const getValue = async (key) => {
@@ -96,7 +207,7 @@ export const postValue = async (newPlan, objectId) => {
 
   if (isValid) {
     console.log("inside is valid check");
-    masterIndexValue = objectId;
+    masterIndexValue = "indexplan";
     console.log("master index value ", masterIndexValue);
     await channel.consume(
       queue,
@@ -106,14 +217,21 @@ export const postValue = async (newPlan, objectId) => {
       { noAck: true }
     );
     console.log("input from user ", input);
+
+    console.log("after elasticsearch mapping function");
     storeInRedis(input);
     console.log("after redis");
     const planCreation = client.json.set(objectId, "$", input);
-    const dataInElasticsearch = await elasticsearchClient.index({
-      index: objectId,
-      id: objectId,
-      document: input,
-    });
+    console.log("master index in post", masterIndexValue);
+    await indexMappingJoins();
+    await save("indexplan", input);
+    // test();
+    // console.log("test");
+    // const dataInElasticsearch = await elasticsearchClient.index({
+    //   index: masterIndexValue,
+    //   id: objectId,
+    //   document: input,
+    // });
   }
   return isValid;
 };
@@ -158,7 +276,7 @@ export const deleteValue = async (key) => {
   // let deletedMasterIndex = await elasticsearchClient.delete({
   //   index: masterIndexValue,
   // });
-  await elasticsearchClient.indices.delete({ index: masterIndexValue });
+  await elasticsearchClient.indices.delete({ index: "indexplan" });
   return deleteStatus;
 };
 
@@ -241,6 +359,8 @@ export const updateNewPlan = async (request, key) => {
           const putValue = await client.json.get(key);
           storeInRedis(putValue);
           console.log("after redis");
+          // await indexMappingJoins();
+          await save("indexplan", input);
           return putValue; //"available"
         } else {
           return "not available";

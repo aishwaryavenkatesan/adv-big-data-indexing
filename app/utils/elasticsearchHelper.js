@@ -5,7 +5,7 @@ const elasticsearchClient = new Client({
   node: "https://localhost:9200/",
   auth: {
     username: "elastic",
-    password: "qgn9CqKCaZGT9Snzy5On",
+    password: "CGvDuJHt*-R7qXS1lbWD",
   },
   tls: {
     ca: readFileSync("/Users/aishwaryavenkatesan/http_ca.crt"),
@@ -15,8 +15,4 @@ const elasticsearchClient = new Client({
 
 let info = await elasticsearchClient.info();
 console.log(info);
-// await elasticsearchClient.ping("error", (err) => {
-//   console.log("elasticsearch is down", err);
-// });
-
 export default elasticsearchClient;
